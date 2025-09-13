@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 import re
 
 # Initialize GPT API
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 DATA_FILE = "data.json"
 
@@ -108,3 +108,4 @@ Rules for generated posts:
             cleaned_output = clean_text(generated_text)
             st.subheader("Generated Posts")
             st.text_area("Output", cleaned_output, height=400)
+
