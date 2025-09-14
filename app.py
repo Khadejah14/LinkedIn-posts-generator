@@ -48,7 +48,7 @@ my_posts_input = st.text_area(
     value="\n".join(data.get("my_posts", []))
 )
 
-st.header("Content You Like (Articles or YouTube links)")
+st.header("Content You Like (Articles/blogs links)")
 content_input = st.text_area(
     "Paste links here (one per line):",
     value="\n".join(data.get("content_links", []))
@@ -108,5 +108,6 @@ Rules for generated posts:
             cleaned_output = clean_text(generated_text)
             st.subheader("Generated Posts")
             st.text_area("Output", cleaned_output, height=400)
+
 
 
