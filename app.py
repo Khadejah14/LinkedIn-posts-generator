@@ -40,7 +40,7 @@ st.title("LinkedIn Post Generator")
 
 st.header("Your LinkedIn Posts (up to 6)")
 my_posts_input = st.text_area(
-    "Paste your posts here (one per line, first sentence is your hook style):",
+    "Paste your posts here and seperate them with # (one per line, first sentence is your hook style):",
     value="\n".join(data.get("my_posts", []))
 )
 
@@ -108,5 +108,6 @@ Rules for generated posts:
             cleaned_output = clean_text(generated_text)
             st.subheader("Generated Posts")
             st.text_area("Output", cleaned_output, height=400)
+
 
 
