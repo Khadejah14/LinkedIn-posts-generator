@@ -50,16 +50,11 @@ drafts_input = st.text_area(
     value="#".join(data.get("drafts", []))
 )
 
-st.header("Optional: Content You Like (Articles/blogs links)")
-content_input = st.text_area(
-    "Paste links here (one per line):",
-    value="\n".join(data.get("content_links", []))
-)
+
 
 if st.button("Save Inputs"):
     data["my_posts"] = [p.strip() for p in my_posts_input.split("\n") if p.strip()]
     data["drafts"] = [d.strip() for d in drafts_input.split("#") if d.strip()]
-    data["content_links"] = [c.strip() for c in content_input.split("\n") if c.strip()]
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
     st.success("Inputs saved!")
@@ -90,9 +85,6 @@ You are a LinkedIn content assistant. I will provide:
 2. My raw drafts or ramblings (rewrite these into polished LinkedIn posts):
 {data['drafts']}
 
-3. Content I like (articles/YouTube/blogs), summarized below (use as knowledge, optional):
-{combined_content}
-
 Rewrite and transform the drafts into {num_posts} polished LinkedIn posts, keeping my style consistent with my past posts.
 
 Rules for generated posts:
@@ -116,4 +108,5 @@ Rules for generated posts:
             cleaned_output = clean_text(generated_text)
             st.subheader("Generated Posts")
             st.text_area("Output", cleaned_output, height=400)
+
 
