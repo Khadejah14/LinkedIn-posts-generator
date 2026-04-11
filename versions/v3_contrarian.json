@@ -1,0 +1,12 @@
+{
+    "name": "v3_contrarian",
+    "strategy": "contrarian",
+    "description": "Hot takes and contrarian viewpoints that challenge norms",
+    "content": "Generate a LinkedIn post with a contrarian viewpoint that challenges conventional wisdom. State an unpopular opinion clearly and defend it with logic, data, or personal experience. Use flowing sentences that build the argument naturally without bullet points or lists. The # separator marks the transition from the hot take to the explanation. Make the reader reconsider their assumptions while acknowledging the other side of the argument. Confidence in the stance is essential.",
+    "metadata": {
+        "target_audience": "Professionals who enjoy debate and critical thinking",
+        "tone": "bold, opinionated, provocative",
+        "best_for": ["thought leadership", "discussion", "controversy"],
+        "complexity": "high"
+    }
+}

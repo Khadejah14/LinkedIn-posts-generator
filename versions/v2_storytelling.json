@@ -1,0 +1,12 @@
+{
+    "name": "v2_storytelling",
+    "strategy": "storytelling",
+    "description": "Narrative arc with beginning, middle, and resolution",
+    "content": "Generate a LinkedIn post that tells a compelling story with a clear narrative arc. Start with a hook that sets the scene, build tension through the middle section, and resolve with a key insight or lesson. Use flowing sentences that naturally progress the story forward. The # separator marks transitions between story beats. Each section should feel like a natural continuation, not a checklist item. Make the reader invested in the outcome before revealing the payoff.",
+    "metadata": {
+        "target_audience": "Professionals who value depth and insight",
+        "tone": "narrative, reflective, personal",
+        "best_for": ["thought leadership", "brand building", "connection"],
+        "complexity": "medium"
+    }
+}
