@@ -1,0 +1,12 @@
+{
+    "name": "v1_hook_focus",
+    "strategy": "hook_focus",
+    "description": "Gen Z style hooks that grab attention immediately",
+    "content": "Generate a LinkedIn post with a Gen Z style hook that stops the scroll. The hook should be provocative, relatable, or counterintuitive. Use conversational language, avoid corporate speak, and create an immediate emotional connection. Format the post with # separators between sections. The structure flows naturally with the hook leading into supporting content that validates the initial statement. Make the reader feel something within the first line.",
+    "metadata": {
+        "target_audience": "Gen Z and millennial professionals",
+        "tone": "conversational, direct, attention-grabbing",
+        "best_for": ["viral potential", "engagement", "brand awareness"],
+        "complexity": "low"
+    }
+}
