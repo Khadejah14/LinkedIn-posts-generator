@@ -6,8 +6,11 @@ from openai import OpenAI
 from bs4 import BeautifulSoup
 import re
 
+from hook_scorer import HookScorer, HookScore
+
 # Initialize GPT API
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+scorer = HookScorer()
 
 DATA_FILE = "data.json"
 
@@ -110,4 +113,116 @@ Rules for generated posts:
             st.text_area("Output", cleaned_output, height=400)
 
 
+st.divider()
+st.header("Hook Scoring & Optimization")
+
+hook_input = st.text_area(
+    "Enter your LinkedIn post hook to score:",
+    placeholder="I turned down a $200K salary to join a startup...",
+    help="Enter just the hook line (first sentence of your post)"
+)
+
+col1, col2 = st.columns(2)
+with col1:
+    generate_variations = st.button("Generate 3 Variations & Score All", type="primary")
+with col2:
+    score_only = st.button("Score Hook Only")
+
+def get_score_color(score: int) -> str:
+    if score >= 7:
+        return "green"
+    elif score >= 4:
+        return "yellow"
+    else:
+        return "red"
+
+def render_score_badge(label: str, score: int) -> None:
+    color = get_score_color(score)
+    st.markdown(f"**{label}:** :{color}[{score}/10]")
+
+def render_score_section(score: HookScore, title: str = "Score Results") -> None:
+    st.subheader(title)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        overall_color = get_score_color(score.overall)
+        st.markdown(f"### Overall: :{overall_color}[{score.overall}/10]")
+    with col2:
+        st.markdown("**Criteria Breakdown:**")
+    with col3:
+        st.empty()
+    
+    cols = st.columns(5)
+    criteria = [
+        ("Scroll-Stopping", score.scroll_stopping),
+        ("Curiosity", score.curiosity),
+        ("Emotion", score.emotion),
+        ("Specificity", score.specificity),
+        ("Brevity", score.brevity),
+    ]
+    for col, (label, val) in zip(cols, criteria):
+        with col:
+            render_score_badge(label, val)
+    
+    st.markdown("---")
+    st.markdown(f"**Reasoning:** {score.reasoning}")
+    
+    if score.improvements:
+        st.markdown("**Suggested Improvements:**")
+        for imp in score.improvements:
+            st.markdown(f"- {imp}")
+
+if score_only and hook_input.strip():
+    with st.spinner("Scoring hook..."):
+        try:
+            score = scorer.score_hook(hook_input.strip())
+            st.session_state["hook_score"] = score
+            st.session_state["variations"] = None
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+if generate_variations and hook_input.strip():
+    with st.spinner("Generating variations and scoring..."):
+        try:
+            variations = scorer.generate_variations(hook_input.strip())
+            st.session_state["variations"] = variations
+            st.session_state["variation_scores"] = scorer.score_variations([v["text"] for v in variations])
+            st.session_state["hook_score"] = None
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+if "variations" in st.session_state and st.session_state["variations"]:
+    st.subheader("Variations")
+    cols = st.columns(3)
+    best_idx = 0
+    best_score = 0
+    
+    for i, (var, score) in enumerate(zip(st.session_state["variations"], st.session_state["variation_scores"])):
+        with cols[i]:
+            angle_color = get_score_color(score.overall)
+            st.markdown(f"**Variation {i+1}** (*{var['angle']}*)")
+            st.markdown(f":{angle_color}[**Score: {score.overall}/10**]")
+            st.text_area(f"var_{i}", var["text"], height=80, key=f"var_area_{i}", label_visibility="collapsed")
+            
+            with st.expander("See detailed score"):
+                render_score_section(score, f"Variation {i+1} Details")
+            
+            if score.overall > best_score:
+                best_score = score.overall
+                best_idx = i
+    
+    if st.button(f"Select Variation {best_idx + 1} as Best", type="primary"):
+        st.session_state["selected_hook"] = st.session_state["variations"][best_idx]["text"]
+        st.success(f"Selected Variation {best_idx + 1} with score {best_score}/10!")
+
+if "hook_score" in st.session_state and st.session_state["hook_score"]:
+    render_score_section(st.session_state["hook_score"])
+
+if "selected_hook" in st.session_state and st.session_state["selected_hook"]:
+    st.divider()
+    st.subheader("Selected Hook")
+    st.success(st.session_state["selected_hook"])
+    if st.button("Copy to Clipboard"):
+        st.code(st.session_state["selected_hook"])
+        st.info("Copy the text above manually (Streamlit doesn't support clipboard API)")
 
