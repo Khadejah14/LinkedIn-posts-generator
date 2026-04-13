@@ -7,10 +7,12 @@ from bs4 import BeautifulSoup
 import re
 
 from hook_scorer import HookScorer, HookScore
+from tone_analyzer import ToneAnalyzer, ToneProfile
 
 # Initialize GPT API
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 scorer = HookScorer()
+tone_analyzer = ToneAnalyzer()
 
 DATA_FILE = "data.json"
 
@@ -225,4 +227,136 @@ if "selected_hook" in st.session_state and st.session_state["selected_hook"]:
     if st.button("Copy to Clipboard"):
         st.code(st.session_state["selected_hook"])
         st.info("Copy the text above manually (Streamlit doesn't support clipboard API)")
+
+
+st.divider()
+st.header("Tone Analyzer")
+
+tone_posts_input = st.text_area(
+    "Paste 3-10 past LinkedIn posts to analyze (separate with #):",
+    placeholder="Post 1...\n---\nPost 2...\n---\nPost 3...",
+    key="tone_posts",
+)
+
+col1, col2 = st.columns(2)
+with col1:
+    extract_btn = st.button("Extract Voice Fingerprint", type="primary")
+with col2:
+    generate_btn = st.button("Generate with Tone")
+
+
+if extract_btn and tone_posts_input.strip():
+    posts = [p.strip() for p in tone_posts_input.split("#") if p.strip()]
+    if len(posts) < 3 or len(posts) > 10:
+        st.error("Please provide between 3 and 10 posts")
+    else:
+        with st.spinner("Analyzing tone..."):
+            try:
+                profile = tone_analyzer.extract_profile(posts)
+                st.session_state["tone_profile"] = profile
+                st.session_state["tone_generated"] = None
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+
+if "tone_profile" in st.session_state and st.session_state["tone_profile"]:
+    profile = st.session_state["tone_profile"]
+    
+    st.subheader("Voice Fingerprint")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Tone Dimensions**")
+        st.progress(profile.vulnerability, text=f"Vulnerability: {profile.vulnerability:.1f}")
+        st.progress(profile.humor, text=f"Humor: {profile.humor:.1f}")
+        st.progress(profile.formality, text=f"Formality: {profile.formality:.1f}")
+        st.progress(profile.story_ratio, text=f"Story Ratio: {profile.story_ratio:.1f}")
+    with c2:
+        st.markdown(f"**Hook Style:** {profile.hook_style}")
+        st.markdown("**Signature Phrases:**")
+        for phrase in profile.signature_phrases:
+            st.markdown(f"- {phrase}")
+    
+    with st.expander("Emotional Palette"):
+        st.write(", ".join(profile.emotional_palette))
+    
+    with st.expander("Common Topics"):
+        for topic in profile.common_topics:
+            st.markdown(f"- {topic}")
+    
+    with st.expander("Voice Signature"):
+        st.write(profile.voice_signature)
+    
+    with st.expander("Tone Summary"):
+        st.write(profile.tone_summary)
+    
+    st.markdown("---")
+    st.markdown("**Radar Chart**")
+    try:
+        import plotly.graph_objects as go
+        categories = ["Vulnerability", "Humor", "Formality", "Story Ratio"]
+        values = [profile.vulnerability, profile.humor, profile.formality, profile.story_ratio]
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=values,
+            theta=categories,
+            fill='toself',
+            name='Tone Profile'
+        ))
+        fig.update_layout(
+            polar=dict(radial=dict(angularaxis=dict(rotation=90))),
+            showlegend=False
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    except ImportError:
+        st.warning("Install plotly for radar chart: pip install plotly")
+
+
+if generate_btn and tone_posts_input.strip():
+    posts = [p.strip() for p in tone_posts_input.split("#") if p.strip()]
+    if len(posts) < 3 or len(posts) > 10:
+        st.error("Please provide between 3 and 10 posts")
+    else:
+        with st.spinner("Extracting profile and generating..."):
+            try:
+                profile = tone_analyzer.extract_profile(posts)
+                st.session_state["tone_profile"] = profile
+                
+                draft = st.session_state.get("tone_draft", "")
+                if not draft:
+                    draft = st.text_input("Enter draft content to rewrite:", key="draft_input")
+                    st.session_state["tone_draft"] = draft
+                
+                if draft:
+                    generated = tone_analyzer.generate_with_profile(draft, profile)
+                    st.session_state["tone_generated"] = generated
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+
+if "tone_generated" in st.session_state and st.session_state["tone_generated"]:
+    st.divider()
+    st.subheader("Before / After Comparison")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Original Draft**")
+        original = st.session_state.get("tone_draft", "")
+        st.text_area("Before", original, height=200, key="before_area")
+    with col2:
+        st.markdown("**Tone-Adjusted**")
+        st.text_area("After", st.session_state["tone_generated"], height=200, key="after_area")
+    
+    with st.expander("See Analysis"):
+        try:
+            comparison = tone_analyzer.compare_drafts(original, st.session_state["tone_generated"])
+            st.markdown("**Improvements:**")
+            for imp in comparison.get("improvements", []):
+                st.markdown(f"- {imp}")
+            st.markdown("**Changes:**")
+            for chg in comparison.get("changes", []):
+                st.markdown(f"- {chg}")
+            st.markdown(f"**Readability Improvement:** {comparison.get('readability_improvement', 0)}%")
+        except:
+            pass
 
