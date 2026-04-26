@@ -1,73 +1,81 @@
-# 📝 LinkedIn Post Generator
+# LinkedIn Post Generator
 
-An AI-powered tool that transforms your drafts and raw thoughts into polished LinkedIn posts using your unique writing style.
+AI-powered tool that transforms your drafts and raw thoughts into polished LinkedIn posts using your unique writing style.
 
-## 🚀 Quick Start
+## Features
 
-### Prerequisites
-- Python 3.8+
-- OpenAI API key
+### 1. Post Generator
+- Paste existing LinkedIn posts (1-6 examples) to learn your style
+- Add raw drafts/ramblings separated by `#`
+- Generate 1-5 polished posts maintaining your voice
 
-### Installation
+### 2. Hook Scoring & Optimization
+- Score hooks on: Scroll-Stopping, Curiosity, Emotion, Specificity, Brevity
+- Generate 3 variations with angle (contrarian, story, question, etc.)
+- Detailed scoring with improvement suggestions
+
+### 3. Tone Analyzer
+- Extract voice fingerprint from 3-10 past posts
+- Analyze: Vulnerability, Humor, Formality, Story Ratio
+- Identify hook style, signature phrases, emotional palette
+- Visual radar chart
+- Generate tone-matched posts
+
+### 4. Voice to Draft
+- Record audio (Streamlit audio_input) or upload files (mp3, wav, m4a)
+- Transcribe via OpenAI Whisper API
+- Auto-clean filler words (um, uh, like, basically, etc.)
+- Structure into Hook/Body/CTA format
+- Generate polished LinkedIn post
+- Save directly to drafts
+
+## Quick Start
+
 ```bash
 git clone https://github.com/Khadejah14/sisu_chatbot2.git
 cd sisu_chatbot2
 pip install -r requirements.txt
-Setup
-Create .env file:
+```
 
-env
-OPENAI_API_KEY=your_openai_api_key_here
+Create `.env` file:
+```
+OPENAI_API_KEY=sk-your-openai-api-key
+```
+
 Run the app:
-
-bash
+```bash
 streamlit run app.py
-💡 How to Use
-1. Provide Your Content
-Your LinkedIn Posts (1-6 examples): Paste existing posts separated by new lines
+```
 
-Your Drafts/Ramblings (1-6 drafts): Add raw thoughts separated by #
+## Requirements
 
-2. Save Inputs & Generate
-Click "Save Inputs" to store your data
+- streamlit
+- openai
+- beautifulsoup4
+- requests
+- python-dotenv
+- plotly
+- pandas
 
-Choose number of posts (1-5)
+## Project Structure
 
-Click "Generate" to create polished posts
-
-🎯 Key Features
-Style Learning: Analyzes your existing posts to maintain your unique voice
-
-Draft Transformation: Converts raw thoughts into professional LinkedIn content
-
-Smart Formatting: Automatic cleaning of dashes, semicolons, and excessive punctuation
-
-Persistent Storage: Saves your inputs locally in data.json
-
-📁 Project Structure
-text
-sisu_chatbot2/
-├── app.py              # LinkedIn Post Generator
-├── sisu_chatbot.py     # SISU Admissions Chatbot
-├── data.json           # User data storage
-├── .env               # Environment variables
-└── requirements.txt   # Dependencies
-🔧 Requirements
-streamlit
-
-openai
-
-beautifulsoup4
-
-requests
-
-python-dotenv
-
-⚠️ Notes
-Always review generated content before posting
-Keep your OpenAI API key secure
-Data is stored locally for privacy
-
-Keep your OpenAI API key secure
-
-Data is stored locally for privacy
+```
+AutoPosts/
+├── app.py                      # Main Streamlit app
+├── voice_to_draft.py           # Voice transcription module
+├── hook_scorer.py             # Hook scoring & variations
+├── tone_analyzer.py           # Voice fingerprint extraction
+├── base.py                   # Base classes
+├── registry.py               # Module registry
+├── data.json                # User data storage
+├── .env                     # Environment variables
+├── requirements.txt         # Dependencies
+├── competitor_tracker/        # Competitor tracking module
+│   ├── analyzer.py
+│   ├── database.py
+│   ├── gap_analyzer.py
+│   ├── scraper.py
+│   └── tracker.py
+├── versions/                # Post version templates
+└── __init__.py
+```
