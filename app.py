@@ -1,6 +1,8 @@
 import streamlit as st
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import requests
 from openai import OpenAI
 from bs4 import BeautifulSoup
@@ -8,6 +10,10 @@ import re
 
 from hook_scorer import HookScorer, HookScore
 from tone_analyzer import ToneAnalyzer, ToneProfile
+from voice_to_draft import (
+    clean_transcript, transcribe_audio, structure_draft,
+    generate_post_from_draft, save_to_drafts, get_all_drafts
+)
 
 # Initialize GPT API
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -359,4 +365,114 @@ if "tone_generated" in st.session_state and st.session_state["tone_generated"]:
             st.markdown(f"**Readability Improvement:** {comparison.get('readability_improvement', 0)}%")
         except:
             pass
+
+
+st.divider()
+st.header("Voice to Draft")
+
+col_mic, col_up = st.columns(2)
+with col_mic:
+    use_recorder = st.radio("Input Method", ["Record Audio", "Upload File"], horizontal=True)
+
+audio_data = None
+transcript_text = ""
+structured_draft = None
+
+if use_recorder == "Record Audio":
+    audio_bytes = st.audio_input("Record your voice memo")
+    if audio_bytes is not None:
+        audio_data = audio_bytes.getvalue()
+else:
+    uploaded_file = st.file_uploader("Upload audio (mp3, wav, m4a)", type=["mp3", "wav", "m4a"])
+    if uploaded_file is not None:
+        audio_data = uploaded_file.getvalue()
+
+if audio_data is not None:
+    file_size_mb = len(audio_data) / (1024 * 1024)
+    st.info(f"File size: {file_size_mb:.2f} MB")
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    if file_size_mb > 25:
+        st.error(f"File too large: {file_size_mb:.2f} MB (max 25MB). Auto-splitting not yet implemented for recording.")
+    else:
+        status_text.text("Transcribing with Whisper...")
+        progress_bar.progress(25)
+        
+        try:
+            transcript_text = transcribe_audio(audio_data, "audio.mp3")
+            st.session_state["voice_transcript"] = transcript_text
+            progress_bar.progress(50)
+        except Exception as e:
+            st.error(f"Transcription error: {e}")
+            transcript_text = ""
+
+if "voice_transcript" in st.session_state and st.session_state["voice_transcript"]:
+    transcript_text = st.session_state["voice_transcript"]
+    progress_bar.progress(75)
+    status_text.text("Cleaning transcript...")
+    
+    cleaned = clean_transcript(transcript_text)
+    progress_bar.progress(100)
+    status_text.text("Done!")
+    
+    st.subheader("Transcript")
+    col_raw, col_clean = st.columns(2)
+    with col_raw:
+        st.text_area("Raw Transcript", transcript_text, height=150)
+    with col_clean:
+        st.text_area("Cleaned Transcript", cleaned, height=150)
+    
+    if st.button("Structure into Hook/Body/CTA"):
+        with st.spinner("Structuring draft..."):
+            try:
+                structured_draft = structure_draft(cleaned)
+                st.session_state["structured_draft"] = structured_draft
+            except Exception as e:
+                st.error(f"Error structuring draft: {e}")
+
+if "structured_draft" in st.session_state and st.session_state["structured_draft"]:
+    draft = st.session_state["structured_draft"]
+    st.subheader("Structured Draft")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.text_area("Hook", draft.get("hook", ""), height=80)
+    with col2:
+        st.text_area("Body", draft.get("body", ""), height=80)
+    with col3:
+        st.text_area("CTA", draft.get("cta", ""), height=80)
+    
+    st.markdown("---")
+    
+    draft_full = f"{draft.get('hook', '')}\n\n{draft.get('body', '')}\n\n{draft.get('cta', '')}"
+    
+    col_add, col_gen = st.columns(2)
+    with col_add:
+        if st.button("Add to Drafts", type="primary"):
+            try:
+                save_to_drafts(draft_full)
+                st.success("Added to drafts in data.json!")
+            except Exception as e:
+                st.error(f"Error saving: {e}")
+    with col_gen:
+        if st.button("Generate Post Now"):
+            with st.spinner("Generating polished LinkedIn post..."):
+                try:
+                    generated_post = generate_post_from_draft(draft_full)
+                    st.session_state["generated_from_voice"] = generated_post
+                except Exception as e:
+                    st.error(f"Error generating: {e}")
+
+if "generated_from_voice" in st.session_state and st.session_state["generated_from_voice"]:
+    st.subheader("Generated LinkedIn Post")
+    st.text_area("Generated Post", st.session_state["generated_from_voice"], height=200)
+    
+    if st.button("Save Generated Post to Drafts"):
+        try:
+            save_to_drafts(st.session_state["generated_from_voice"])
+            st.success("Saved to drafts!")
+        except Exception as e:
+            st.error(f"Error saving: {e}")
 
