@@ -1,0 +1,33 @@
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data and databases
+*.db
+*.sqlite
+*.json
+
+# Cache directories
+.hook_cache/
+.tone_cache/
+
+# Build/dist
+build/
+dist/
+*.egg-info/
+
+# OS
+Thumbs.db
+Desktop.ini

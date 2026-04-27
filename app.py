@@ -1,164 +1,107 @@
+"""Streamlit UI for LinkedIn Post Generator."""
+
 import streamlit as st
-import json
-import os
+
 from dotenv import load_dotenv
 load_dotenv()
-import requests
-from openai import OpenAI
-from bs4 import BeautifulSoup
-import re
 
-from hook_scorer import HookScorer, HookScore
-from tone_analyzer import ToneAnalyzer, ToneProfile
-from voice_to_draft import (
-    clean_transcript, transcribe_audio, structure_draft,
-    generate_post_from_draft, save_to_drafts, get_all_drafts
+from features.post_generator import generate_posts, add_drafts
+from features.hook_scorer import score_hook, generate_variations, score_variations, HookScore
+from features.tone_analyzer import extract_profile, generate_with_profile, compare_drafts, ToneProfile
+from features.voice_to_draft import clean_transcript, transcribe, structure, generate_post, add_to_drafts
+from features.style_comparison import (
+    compare_with_creator, get_creator_names, get_creator_profile, get_radar_data, StyleComparison
 )
+from utils import load_data, save_data, get_score_color
 
-# Initialize GPT API
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-scorer = HookScorer()
-tone_analyzer = ToneAnalyzer()
 
-DATA_FILE = "data.json"
-
-# Load or initialize data
-if os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "r") as f:
-        data = json.load(f)
-else:
-    data = {"my_posts": [], "drafts": [], "content_links": []}
-
-# --- Helper to fetch article content ---
-def fetch_content(url):
-    try:
-        r = requests.get(url, timeout=5)
-        soup = BeautifulSoup(r.text, "html.parser")
-        paragraphs = soup.find_all("p")
-        text = "\n".join([p.get_text() for p in paragraphs])
-        return text[:2000]  # limit to first 2000 chars
-    except:
-        return ""
-
-# --- Helper to clean text ---
-def clean_text(text):
-    text = re.sub(r"[-–—;]", "", text)  # Remove dashes and semicolons
-    text = re.sub(r"\.{2,}", ".", text)  # Remove excessive periods
-    return text
-
-# --- Streamlit UI ---
+st.set_page_config(page_title="LinkedIn Post Generator", layout="wide")
 st.title("LinkedIn Post Generator")
 
-st.header("Your LinkedIn Posts (up to 6)")
-my_posts_input = st.text_area(
-    "Paste your posts here and seperate them with # (one per line, first sentence is your hook style):",
-    value="\n".join(data.get("my_posts", []))
-)
 
-st.header("Your Drafts / Ramblings (up to 6, separate with #)")
-drafts_input = st.text_area(
-    "Paste your drafts or raw thoughts here, separate each draft with a #:",
-    value="#".join(data.get("drafts", []))
-)
+def main():
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["Post Generator", "Hook Scorer", "Tone Analyzer", "Voice to Draft", "Style Comparison"]
+    )
 
-
-
-if st.button("Save Inputs"):
-    data["my_posts"] = [p.strip() for p in my_posts_input.split("\n") if p.strip()]
-    data["drafts"] = [d.strip() for d in drafts_input.split("#") if d.strip()]
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-    st.success("Inputs saved!")
-
-st.header("Generate Posts")
-num_posts = st.number_input("Number of posts to generate:", min_value=1, max_value=5, value=3)
-
-if st.button("Generate"):
-    if not data["my_posts"]:
-        st.error("Please add your LinkedIn posts first!")
-    elif not data["drafts"]:
-        st.error("Please add at least one draft!")
-    else:
-        # Fetch summaries from links
-        st.info("Fetching content from links...")
-        content_texts = []
-        for url in data["content_links"]:
-            content_texts.append(fetch_content(url))
-        combined_content = "\n".join(content_texts) if content_texts else "No content links provided."
-
-        # Prepare prompt for GPT
-        prompt = f"""
-You are a LinkedIn content assistant. I will provide:
-
-1. My previous LinkedIn posts (this is my style and tone, including hooks):
-{data['my_posts']}
-
-2. My raw drafts or ramblings (rewrite these into polished LinkedIn posts):
-{data['drafts']}
-
-Rewrite and transform the drafts into {num_posts} polished LinkedIn posts, keeping my style consistent with my past posts.
-
-Rules for generated posts:
-- Start with a short, catchy, scroll-stopping hook at the beginning, following the hook style in my posts (think like Gen Z)
-- Hooks should be concise, 1 sentence, grab attention immediately
-- After the hook, rewrite the draft content into a flowing, engaging post using my style
-- NEVER use any dashes (-, –, —)
-- NEVER use semicolons (;)
-- Use commas instead of many periods, keep sentences flowing naturally
-- Avoid bad words like f*ck
-- Separate each post with a single "#" on a new line
-"""
-
-        with st.spinner("Generating posts..."):
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            generated_text = response.choices[0].message.content
-            cleaned_output = clean_text(generated_text)
-            st.subheader("Generated Posts")
-            st.text_area("Output", cleaned_output, height=400)
+    with tab1:
+        render_post_generator()
+    with tab2:
+        render_hook_scorer()
+    with tab3:
+        render_tone_analyzer()
+    with tab4:
+        render_voice_to_draft()
+    with tab5:
+        render_style_comparison()
 
 
-st.divider()
-st.header("Hook Scoring & Optimization")
-
-hook_input = st.text_area(
-    "Enter your LinkedIn post hook to score:",
-    placeholder="I turned down a $200K salary to join a startup...",
-    help="Enter just the hook line (first sentence of your post)"
-)
-
-col1, col2 = st.columns(2)
-with col1:
-    generate_variations = st.button("Generate 3 Variations & Score All", type="primary")
-with col2:
-    score_only = st.button("Score Hook Only")
-
-def get_score_color(score: int) -> str:
-    if score >= 7:
-        return "green"
-    elif score >= 4:
-        return "yellow"
-    else:
-        return "red"
-
-def render_score_badge(label: str, score: int) -> None:
-    color = get_score_color(score)
-    st.markdown(f"**{label}:** :{color}[{score}/10]")
-
-def render_score_section(score: HookScore, title: str = "Score Results") -> None:
-    st.subheader(title)
+def render_post_generator():
+    data = load_data()
     
-    col1, col2, col3 = st.columns(3)
+    st.header("Your LinkedIn Posts")
+    my_posts_input = st.text_area(
+        "Paste your posts (separated by new lines):",
+        value="\n".join(data.get("my_posts", []))
+    )
+    
+    st.header("Your Drafts")
+    drafts_input = st.text_area(
+        "Paste your drafts (separated by #):",
+        value="#".join(data.get("drafts", []))
+    )
+    
+    if st.button("Save Inputs"):
+        data["my_posts"] = [p.strip() for p in my_posts_input.split("\n") if p.strip()]
+        data["drafts"] = [d.strip() for d in drafts_input.split("#") if d.strip()]
+        save_data(data)
+        st.success("Saved!")
+    
+    st.header("Generate Posts")
+    num_posts = st.number_input("Number of posts:", min_value=1, max_value=5, value=3)
+    
+    if st.button("Generate"):
+        try:
+            result = generate_posts(num_posts)
+            st.text_area("Generated", result, height=400)
+        except ValueError as e:
+            st.error(str(e))
+
+
+def render_hook_scorer():
+    hook = st.text_area("Enter hook to score:", placeholder="I turned down a $200K salary...")
+    
+    col1, col2 = st.columns(2)
     with col1:
-        overall_color = get_score_color(score.overall)
-        st.markdown(f"### Overall: :{overall_color}[{score.overall}/10]")
+        score_btn = st.button("Score Hook", type="primary")
     with col2:
-        st.markdown("**Criteria Breakdown:**")
-    with col3:
-        st.empty()
+        vary_btn = st.button("Generate Variations")
+    
+    if score_btn and hook:
+        with st.spinner("Scoring..."):
+            score = score_hook(hook)
+            render_hook_score(score)
+    
+    if vary_btn and hook:
+        with st.spinner("Generating..."):
+            vars = generate_variations(hook)
+            scores = score_variations([v["text"] for v in vars])
+            
+            for i, (v, s) in enumerate(zip(vars, scores)):
+                with st.expander(f"Variation {i+1}: {v['angle']}"):
+                    st.text_area(f"var_{i}", v["text"], height=60)
+                    color = get_score_color(s.overall)
+                    st.markdown(f":{color}[**Score: {s.overall}/10**]")
+    
+    if "hook_score" in st.session_state:
+        render_hook_score(st.session_state["hook_score"])
+
+
+def render_hook_score(score: HookScore):
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        color = get_score_color(score.overall)
+        st.markdown(f"### Overall: :{color}[{score.overall}/10]")
     
     cols = st.columns(5)
     criteria = [
@@ -170,106 +113,56 @@ def render_score_section(score: HookScore, title: str = "Score Results") -> None
     ]
     for col, (label, val) in zip(cols, criteria):
         with col:
-            render_score_badge(label, val)
+            color = get_score_color(val)
+            st.markdown(f"**{label}:** :{color}[{val}/10]")
     
-    st.markdown("---")
     st.markdown(f"**Reasoning:** {score.reasoning}")
-    
     if score.improvements:
-        st.markdown("**Suggested Improvements:**")
+        st.markdown("**Improvements:**")
         for imp in score.improvements:
             st.markdown(f"- {imp}")
 
-if score_only and hook_input.strip():
-    with st.spinner("Scoring hook..."):
-        try:
-            score = scorer.score_hook(hook_input.strip())
-            st.session_state["hook_score"] = score
-            st.session_state["variations"] = None
-        except Exception as e:
-            st.error(f"Error: {e}")
 
-if generate_variations and hook_input.strip():
-    with st.spinner("Generating variations and scoring..."):
-        try:
-            variations = scorer.generate_variations(hook_input.strip())
-            st.session_state["variations"] = variations
-            st.session_state["variation_scores"] = scorer.score_variations([v["text"] for v in variations])
-            st.session_state["hook_score"] = None
-        except Exception as e:
-            st.error(f"Error: {e}")
-
-if "variations" in st.session_state and st.session_state["variations"]:
-    st.subheader("Variations")
-    cols = st.columns(3)
-    best_idx = 0
-    best_score = 0
+def render_tone_analyzer():
+    posts_input = st.text_area(
+        "Paste 3-10 posts (separated by #):",
+        placeholder="Post 1...\n#\nPost 2...\n#\nPost 3..."
+    )
     
-    for i, (var, score) in enumerate(zip(st.session_state["variations"], st.session_state["variation_scores"])):
-        with cols[i]:
-            angle_color = get_score_color(score.overall)
-            st.markdown(f"**Variation {i+1}** (*{var['angle']}*)")
-            st.markdown(f":{angle_color}[**Score: {score.overall}/10**]")
-            st.text_area(f"var_{i}", var["text"], height=80, key=f"var_area_{i}", label_visibility="collapsed")
-            
-            with st.expander("See detailed score"):
-                render_score_section(score, f"Variation {i+1} Details")
-            
-            if score.overall > best_score:
-                best_score = score.overall
-                best_idx = i
+    col1, col2 = st.columns(2)
+    with col1:
+        extract_btn = st.button("Extract Voice", type="primary")
+    with col2:
+        generate_btn = st.button("Generate with Tone")
     
-    if st.button(f"Select Variation {best_idx + 1} as Best", type="primary"):
-        st.session_state["selected_hook"] = st.session_state["variations"][best_idx]["text"]
-        st.success(f"Selected Variation {best_idx + 1} with score {best_score}/10!")
-
-if "hook_score" in st.session_state and st.session_state["hook_score"]:
-    render_score_section(st.session_state["hook_score"])
-
-if "selected_hook" in st.session_state and st.session_state["selected_hook"]:
-    st.divider()
-    st.subheader("Selected Hook")
-    st.success(st.session_state["selected_hook"])
-    if st.button("Copy to Clipboard"):
-        st.code(st.session_state["selected_hook"])
-        st.info("Copy the text above manually (Streamlit doesn't support clipboard API)")
-
-
-st.divider()
-st.header("Tone Analyzer")
-
-tone_posts_input = st.text_area(
-    "Paste 3-10 past LinkedIn posts to analyze (separate with #):",
-    placeholder="Post 1...\n---\nPost 2...\n---\nPost 3...",
-    key="tone_posts",
-)
-
-col1, col2 = st.columns(2)
-with col1:
-    extract_btn = st.button("Extract Voice Fingerprint", type="primary")
-with col2:
-    generate_btn = st.button("Generate with Tone")
-
-
-if extract_btn and tone_posts_input.strip():
-    posts = [p.strip() for p in tone_posts_input.split("#") if p.strip()]
-    if len(posts) < 3 or len(posts) > 10:
-        st.error("Please provide between 3 and 10 posts")
-    else:
-        with st.spinner("Analyzing tone..."):
-            try:
-                profile = tone_analyzer.extract_profile(posts)
-                st.session_state["tone_profile"] = profile
-                st.session_state["tone_generated"] = None
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-
-if "tone_profile" in st.session_state and st.session_state["tone_profile"]:
-    profile = st.session_state["tone_profile"]
+    if extract_btn and posts_input:
+        posts = [p.strip() for p in posts_input.split("#") if p.strip()]
+        if len(posts) < 3 or len(posts) > 10:
+            st.error("Provide 3-10 posts")
+            return
+        
+        with st.spinner("Analyzing..."):
+            profile = extract_profile(posts)
+            st.session_state["tone_profile"] = profile
     
-    st.subheader("Voice Fingerprint")
+    if "tone_profile" in st.session_state:
+        profile = st.session_state["tone_profile"]
+        render_tone_profile(profile)
     
+    if generate_btn and posts_input:
+        posts = [p.strip() for p in posts_input.split("#") if p.strip()]
+        if len(posts) < 3 or len(posts) > 10:
+            st.error("Provide 3-10 posts")
+            return
+        
+        draft = st.text_input("Draft to rewrite:")
+        if draft and "tone_profile" in st.session_state:
+            with st.spinner("Generating..."):
+                result = generate_with_profile(draft, st.session_state["tone_profile"])
+                st.text_area("Generated", result, height=200)
+
+
+def render_tone_profile(profile: ToneProfile):
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("**Tone Dimensions**")
@@ -283,196 +176,181 @@ if "tone_profile" in st.session_state and st.session_state["tone_profile"]:
         for phrase in profile.signature_phrases:
             st.markdown(f"- {phrase}")
     
-    with st.expander("Emotional Palette"):
-        st.write(", ".join(profile.emotional_palette))
-    
-    with st.expander("Common Topics"):
-        for topic in profile.common_topics:
-            st.markdown(f"- {topic}")
-    
     with st.expander("Voice Signature"):
         st.write(profile.voice_signature)
-    
-    with st.expander("Tone Summary"):
-        st.write(profile.tone_summary)
-    
-    st.markdown("---")
-    st.markdown("**Radar Chart**")
-    try:
-        import plotly.graph_objects as go
-        categories = ["Vulnerability", "Humor", "Formality", "Story Ratio"]
-        values = [profile.vulnerability, profile.humor, profile.formality, profile.story_ratio]
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(
-            r=values,
-            theta=categories,
-            fill='toself',
-            name='Tone Profile'
-        ))
-        fig.update_layout(
-            polar=dict(radial=dict(angularaxis=dict(rotation=90))),
-            showlegend=False
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    except ImportError:
-        st.warning("Install plotly for radar chart: pip install plotly")
 
 
-if generate_btn and tone_posts_input.strip():
-    posts = [p.strip() for p in tone_posts_input.split("#") if p.strip()]
-    if len(posts) < 3 or len(posts) > 10:
-        st.error("Please provide between 3 and 10 posts")
+def render_voice_to_draft():
+    method = st.radio("Input", ["Record", "Upload"], horizontal=True)
+    
+    audio_data = None
+    if method == "Record":
+        audio = st.audio_input("Record")
+        if audio:
+            audio_data = audio.getvalue()
     else:
-        with st.spinner("Extracting profile and generating..."):
-            try:
-                profile = tone_analyzer.extract_profile(posts)
-                st.session_state["tone_profile"] = profile
-                
-                draft = st.session_state.get("tone_draft", "")
-                if not draft:
-                    draft = st.text_input("Enter draft content to rewrite:", key="draft_input")
-                    st.session_state["tone_draft"] = draft
-                
-                if draft:
-                    generated = tone_analyzer.generate_with_profile(draft, profile)
-                    st.session_state["tone_generated"] = generated
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-
-if "tone_generated" in st.session_state and st.session_state["tone_generated"]:
-    st.divider()
-    st.subheader("Before / After Comparison")
+        uploaded = st.file_uploader("Upload (mp3, wav, m4a)", type=["mp3", "wav", "m4a"])
+        if uploaded:
+            audio_data = uploaded.getvalue()
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**Original Draft**")
-        original = st.session_state.get("tone_draft", "")
-        st.text_area("Before", original, height=200, key="before_area")
-    with col2:
-        st.markdown("**Tone-Adjusted**")
-        st.text_area("After", st.session_state["tone_generated"], height=200, key="after_area")
-    
-    with st.expander("See Analysis"):
-        try:
-            comparison = tone_analyzer.compare_drafts(original, st.session_state["tone_generated"])
-            st.markdown("**Improvements:**")
-            for imp in comparison.get("improvements", []):
-                st.markdown(f"- {imp}")
-            st.markdown("**Changes:**")
-            for chg in comparison.get("changes", []):
-                st.markdown(f"- {chg}")
-            st.markdown(f"**Readability Improvement:** {comparison.get('readability_improvement', 0)}%")
-        except:
-            pass
-
-
-st.divider()
-st.header("Voice to Draft")
-
-col_mic, col_up = st.columns(2)
-with col_mic:
-    use_recorder = st.radio("Input Method", ["Record Audio", "Upload File"], horizontal=True)
-
-audio_data = None
-transcript_text = ""
-structured_draft = None
-
-if use_recorder == "Record Audio":
-    audio_bytes = st.audio_input("Record your voice memo")
-    if audio_bytes is not None:
-        audio_data = audio_bytes.getvalue()
-else:
-    uploaded_file = st.file_uploader("Upload audio (mp3, wav, m4a)", type=["mp3", "wav", "m4a"])
-    if uploaded_file is not None:
-        audio_data = uploaded_file.getvalue()
-
-if audio_data is not None:
-    file_size_mb = len(audio_data) / (1024 * 1024)
-    st.info(f"File size: {file_size_mb:.2f} MB")
-    
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    if file_size_mb > 25:
-        st.error(f"File too large: {file_size_mb:.2f} MB (max 25MB). Auto-splitting not yet implemented for recording.")
-    else:
-        status_text.text("Transcribing with Whisper...")
-        progress_bar.progress(25)
+    if audio_data:
+        size_mb = len(audio_data) / (1024 * 1024)
+        st.info(f"File size: {size_mb:.2f} MB")
         
-        try:
-            transcript_text = transcribe_audio(audio_data, "audio.mp3")
-            st.session_state["voice_transcript"] = transcript_text
-            progress_bar.progress(50)
-        except Exception as e:
-            st.error(f"Transcription error: {e}")
-            transcript_text = ""
+        if size_mb > 25:
+            st.error("File too large (max 25MB)")
+            return
+        
+        progress = st.progress(0)
+        
+        progress.progress(25)
+        transcript = transcribe(audio_data)
+        st.session_state["voice_transcript"] = transcript
+        
+        progress.progress(50)
+        cleaned = clean_transcript(transcript)
+        progress.progress(100)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_area("Raw", transcript, height=150)
+        with col2:
+            st.text_area("Cleaned", cleaned, height=150)
+        
+        if st.button("Structure"):
+            structured = structure(cleaned)
+            st.session_state["structured_draft"] = structured
+    
+    if "structured_draft" in st.session_state:
+        draft = st.session_state["structured_draft"]
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.text_area("Hook", draft.get("hook", ""), height=80)
+        with c2:
+            st.text_area("Body", draft.get("body", ""), height=80)
+        with c3:
+            st.text_area("CTA", draft.get("cta", ""), height=80)
+        
+        full_draft = f"{draft.get('hook', '')}\n\n{draft.get('body', '')}\n\n{draft.get('cta', '')}"
+        
+        col_add, col_gen = st.columns(2)
+        with col_add:
+            if st.button("Add to Drafts"):
+                add_to_drafts(full_draft)
+                st.success("Added!")
+        with col_gen:
+            if st.button("Generate Post"):
+                with st.spinner("Generating..."):
+                    post = generate_post(full_draft)
+                    st.session_state["generated_post"] = post
+    
+    if "generated_post" in st.session_state:
+        st.text_area("Generated Post", st.session_state["generated_post"], height=200)
+        if st.button("Save Generated"):
+            add_to_drafts(st.session_state["generated_post"])
+            st.success("Saved!")
 
-if "voice_transcript" in st.session_state and st.session_state["voice_transcript"]:
-    transcript_text = st.session_state["voice_transcript"]
-    progress_bar.progress(75)
-    status_text.text("Cleaning transcript...")
-    
-    cleaned = clean_transcript(transcript_text)
-    progress_bar.progress(100)
-    status_text.text("Done!")
-    
-    st.subheader("Transcript")
-    col_raw, col_clean = st.columns(2)
-    with col_raw:
-        st.text_area("Raw Transcript", transcript_text, height=150)
-    with col_clean:
-        st.text_area("Cleaned Transcript", cleaned, height=150)
-    
-    if st.button("Structure into Hook/Body/CTA"):
-        with st.spinner("Structuring draft..."):
+
+def render_style_comparison():
+    from features.tone_analyzer import ToneProfile
+
+    st.header("Style Comparison")
+    st.caption("Compare your voice against top LinkedIn creators")
+
+    creators = get_creator_names()
+    selected_creator = st.selectbox("Select a creator to compare with:", creators)
+
+    if st.button("Compare My Style", type="primary"):
+        if "tone_profile" not in st.session_state:
+            st.error("Extract your voice profile first in the Tone Analyzer tab")
+            return
+
+        user_profile = st.session_state["tone_profile"].to_dict()
+
+        with st.spinner(f"Comparing with {selected_creator}..."):
+            comparison = compare_with_creator(user_profile, selected_creator)
+            st.session_state["style_comparison"] = comparison
+
+    if "style_comparison" in st.session_state:
+        comparison = st.session_state["style_comparison"]
+
+        # Radar chart
+        radar_data = get_radar_data(comparison.user_profile, comparison.creator_profile)
+
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            st.subheader("Dimension Comparison")
             try:
-                structured_draft = structure_draft(cleaned)
-                st.session_state["structured_draft"] = structured_draft
-            except Exception as e:
-                st.error(f"Error structuring draft: {e}")
+                import plotly.graph_objects as go
 
-if "structured_draft" in st.session_state and st.session_state["structured_draft"]:
-    draft = st.session_state["structured_draft"]
-    st.subheader("Structured Draft")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.text_area("Hook", draft.get("hook", ""), height=80)
-    with col2:
-        st.text_area("Body", draft.get("body", ""), height=80)
-    with col3:
-        st.text_area("CTA", draft.get("cta", ""), height=80)
-    
-    st.markdown("---")
-    
-    draft_full = f"{draft.get('hook', '')}\n\n{draft.get('body', '')}\n\n{draft.get('cta', '')}"
-    
-    col_add, col_gen = st.columns(2)
-    with col_add:
-        if st.button("Add to Drafts", type="primary"):
-            try:
-                save_to_drafts(draft_full)
-                st.success("Added to drafts in data.json!")
-            except Exception as e:
-                st.error(f"Error saving: {e}")
-    with col_gen:
-        if st.button("Generate Post Now"):
-            with st.spinner("Generating polished LinkedIn post..."):
-                try:
-                    generated_post = generate_post_from_draft(draft_full)
-                    st.session_state["generated_from_voice"] = generated_post
-                except Exception as e:
-                    st.error(f"Error generating: {e}")
+                fig = go.Figure()
+                fig.add_trace(go.Scatterpolar(
+                    r=radar_data["user_values"] + [radar_data["user_values"][0]],
+                    theta=radar_data["dimensions"] + [radar_data["dimensions"][0]],
+                    fill='toself',
+                    name='You'
+                ))
+                fig.add_trace(go.Scatterpolar(
+                    r=radar_data["creator_values"] + [radar_data["creator_values"][0]],
+                    theta=radar_data["dimensions"] + [radar_data["dimensions"][0]],
+                    fill='toself',
+                    name=comparison.creator_name
+                ))
+                fig.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+                    showlegend=True,
+                    height=400
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except ImportError:
+                for dim, user_val, creator_val in zip(
+                    radar_data["dimensions"], radar_data["user_values"], radar_data["creator_values"]
+                ):
+                    st.text(f"{dim.title()}: You {user_val:.1f} vs {comparison.creator_name} {creator_val:.1f}")
+                    st.progress(creator_val, text=f"Target: {creator_val:.1f}")
 
-if "generated_from_voice" in st.session_state and st.session_state["generated_from_voice"]:
-    st.subheader("Generated LinkedIn Post")
-    st.text_area("Generated Post", st.session_state["generated_from_voice"], height=200)
-    
-    if st.button("Save Generated Post to Drafts"):
-        try:
-            save_to_drafts(st.session_state["generated_from_voice"])
-            st.success("Saved to drafts!")
-        except Exception as e:
-            st.error(f"Error saving: {e}")
+        with col2:
+            st.subheader("Gaps")
+            for gap in comparison.gaps:
+                st.warning(f"**{gap}**")
 
+            st.subheader("Your Unique Traits")
+            for trait in comparison.unique_traits[:3]:
+                st.success(f"✓ {trait}")
+
+            st.subheader("Missing Traits")
+            for trait in comparison.missing_traits[:3]:
+                st.error(f"✗ {trait}")
+
+        st.divider()
+
+        st.subheader("3 Actions to Close Gaps")
+        for i, action in enumerate(comparison.actions, 1):
+            st.markdown(f"**{i}.** {action}")
+
+        st.divider()
+
+        st.subheader("Adopt This Trait")
+        st.caption("Inject creator traits into your post generation")
+
+        adoptable = comparison.adoptable_traits
+        if adoptable:
+            cols = st.columns(len(adoptable))
+            for i, (trait, score) in enumerate(adoptable.items()):
+                with cols[i]:
+                    if st.button(f"Adopt: {trait}", key=f"adopt_{trait}"):
+                        if "adopted_traits" not in st.session_state:
+                            st.session_state["adopted_traits"] = {}
+                        st.session_state["adopted_traits"][trait] = score
+                        st.success(f"Added {trait} to your profile!")
+
+        if "adopted_traits" in st.session_state and st.session_state["adopted_traits"]:
+            st.info(f"**Adopted traits:** {', '.join(st.session_state['adopted_traits'].keys())}")
+            if st.button("Clear Adopted Traits"):
+                st.session_state["adopted_traits"] = {}
+                st.rerun()
+
+
+if __name__ == "__main__":
+    main()
