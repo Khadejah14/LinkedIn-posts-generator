@@ -26,14 +26,29 @@ AI-powered tool that transforms your drafts and raw thoughts into polished Linke
 - Transcribe via OpenAI Whisper API
 - Auto-clean filler words (um, uh, like, basically, etc.)
 - Structure into Hook/Body/CTA format
-- Generate polished LinkedIn post
+- Generate polished LinkedIn Post
 - Save directly to drafts
+
+### 5. Style Comparison
+- Compare your writing style against competitors or industry leaders
+- Identify gaps and opportunities for differentiation
+
+### 6. Competitor Tracker
+- Track competitor LinkedIn posts and engagement
+- Analyze posting patterns and content strategies
+- Identify content gaps with gap analysis
+- Separate Streamlit app interface (`competitor_tracker_app.py`)
+
+### 7. Services Layer
+- **Post Service**: Orchestrates post generation workflow (tone analysis → post generation → hook scoring)
+- **Analysis Service**: Combines tone analysis with style comparison across multiple creators
+- Enables API integration for programmatic access
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/Khadejah14/sisu_chatbot2.git
-cd sisu_chatbot2
+git clone https://github.com/Khadejah14/AutoPosts.git
+cd AutoPosts
 pip install -r requirements.txt
 ```
 
@@ -42,19 +57,24 @@ Create `.env` file:
 OPENAI_API_KEY=sk-your-openai-api-key
 ```
 
-Run the app:
+Run the main app:
 ```bash
 streamlit run app.py
+```
+
+Run the competitor tracker app:
+```bash
+streamlit run competitor_tracker_app.py
 ```
 
 ## Requirements
 
 - streamlit
 - openai
-- beautifulsoup4
 - requests
-- python-dotenv
+- beautifulsoup4
 - plotly
+- python-dotenv
 - pandas
 
 ## Project Structure
@@ -62,20 +82,40 @@ streamlit run app.py
 ```
 AutoPosts/
 ├── app.py                      # Main Streamlit app
-├── voice_to_draft.py           # Voice transcription module
-├── hook_scorer.py             # Hook scoring & variations
-├── tone_analyzer.py           # Voice fingerprint extraction
-├── base.py                   # Base classes
-├── registry.py               # Module registry
-├── data.json                # User data storage
-├── .env                     # Environment variables
-├── requirements.txt         # Dependencies
-├── competitor_tracker/        # Competitor tracking module
-│   ├── analyzer.py
-│   ├── database.py
-│   ├── gap_analyzer.py
-│   ├── scraper.py
-│   └── tracker.py
-├── versions/                # Post version templates
-└── __init__.py
+├── competitor_tracker_app.py   # Competitor tracker Streamlit app
+├── config.py                   # Configuration settings
+├── llm.py                      # LLM integration utilities
+├── utils.py                    # Utility functions
+├── core/                       # Core framework
+│   ├── __init__.py
+│   ├── base.py                 # Base classes
+│   └── registry.py             # Module registry
+├── features/                   # Feature modules (independent)
+│   ├── __init__.py
+│   ├── hook_scorer.py         # Hook scoring & variations
+│   ├── post_generator.py      # Post generation logic
+│   ├── style_comparison.py    # Style comparison tool
+│   ├── tone_analyzer.py       # Voice fingerprint extraction
+│   └── voice_to_draft.py      # Voice transcription module
+├── services/                   # Service layer (orchestrates features)
+│   ├── __init__.py
+│   ├── post_service.py        # Post generation workflow
+│   └── analysis_service.py    # Voice analysis & style comparison
+├── competitor_tracker/         # Competitor tracking module
+│   ├── __init__.py
+│   ├── analyzer.py            # Content analysis
+│   ├── database.py            # SQLite database
+│   ├── gap_analyzer.py        # Content gap analysis
+│   ├── scraper.py             # LinkedIn scraping
+│   └── tracker.py             # Competitor tracking logic
+├── versions/                   # Post version templates
+│   ├── __init__.py
+│   ├── v1_hook_focus.json
+│   ├── v2_storytelling.json
+│   └── v3_contrarian.json
+├── data/                       # User data storage
+│   └── data.json
+├── .env                        # Environment variables
+├── requirements.txt            # Dependencies
+└── Dockerfile                  # Docker configuration
 ```
