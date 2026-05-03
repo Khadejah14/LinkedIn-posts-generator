@@ -39,6 +39,11 @@ AI-powered tool that transforms your drafts and raw thoughts into polished Linke
 - Identify content gaps with gap analysis
 - Separate Streamlit app interface (`competitor_tracker_app.py`)
 
+### 7. Services Layer
+- **Post Service**: Orchestrates post generation workflow (tone analysis → post generation → hook scoring)
+- **Analysis Service**: Combines tone analysis with style comparison across multiple creators
+- Enables API integration for programmatic access
+
 ## Quick Start
 
 ```bash
@@ -85,13 +90,17 @@ AutoPosts/
 │   ├── __init__.py
 │   ├── base.py                 # Base classes
 │   └── registry.py             # Module registry
-├── features/                   # Feature modules
+├── features/                   # Feature modules (independent)
 │   ├── __init__.py
 │   ├── hook_scorer.py         # Hook scoring & variations
 │   ├── post_generator.py      # Post generation logic
 │   ├── style_comparison.py    # Style comparison tool
 │   ├── tone_analyzer.py       # Voice fingerprint extraction
 │   └── voice_to_draft.py      # Voice transcription module
+├── services/                   # Service layer (orchestrates features)
+│   ├── __init__.py
+│   ├── post_service.py        # Post generation workflow
+│   └── analysis_service.py    # Voice analysis & style comparison
 ├── competitor_tracker/         # Competitor tracking module
 │   ├── __init__.py
 │   ├── analyzer.py            # Content analysis
