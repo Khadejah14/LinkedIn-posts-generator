@@ -60,6 +60,21 @@ def get_posts(user_id: int, post_type: str | None = None) -> list[Post]:
     ]
 
 
+def get_post(post_id: int) -> Post | None:
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return Post(
+        id=row["id"],
+        user_id=row["user_id"],
+        content=row["content"],
+        post_type=row["post_type"],
+        created_at=row["created_at"],
+    )
+
+
 def delete_post(post_id: int) -> bool:
     conn = get_connection()
     cursor = conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))

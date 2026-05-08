@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.env
+.hook_cache/
+.tone_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+versions/
+CUsersKadejDesktopAutoPostsversions/

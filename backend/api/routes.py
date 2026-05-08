@@ -11,6 +11,8 @@ from services.analysis_service import (
     get_available_creators,
     compare_with_multiple_creators,
 )
+from models.user import create_user, get_user, list_users, UserCreate
+from models.post import save_post, get_post, get_posts, delete_post, PostCreate
 
 router = APIRouter()
 
@@ -80,3 +82,56 @@ def multi_creator_endpoint(req: MultiCreatorRequest):
 @router.get("/creators")
 def get_creators():
     return {"creators": get_available_creators()}
+
+
+# --- Workspace endpoints ---
+
+
+class SavePostRequest(BaseModel):
+    user_id: int
+    content: str
+    post_type: str = "post"
+
+
+class CreateUserRequest(BaseModel):
+    name: str
+
+
+@router.post("/workspace/users")
+def create_workspace_user(req: CreateUserRequest):
+    user = create_user(UserCreate(name=req.name))
+    return user
+
+
+@router.get("/workspace/users")
+def list_workspace_users():
+    return {"users": list_users()}
+
+
+@router.post("/workspace/posts")
+def save_workspace_post(req: SavePostRequest):
+    post = save_post(PostCreate(user_id=req.user_id, content=req.content, post_type=req.post_type))
+    return post
+
+
+@router.get("/workspace/posts/{user_id}")
+def get_workspace_posts(user_id: int, post_type: str | None = None):
+    if not get_user(user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"posts": get_posts(user_id, post_type)}
+
+
+@router.get("/workspace/posts/single/{post_id}")
+def get_workspace_post(post_id: int):
+    post = get_post(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
+
+
+@router.delete("/workspace/posts/{post_id}")
+def delete_workspace_post(post_id: int):
+    deleted = delete_post(post_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return {"deleted": True}
