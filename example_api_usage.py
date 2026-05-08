@@ -4,6 +4,9 @@ This shows how the services would be called from an API endpoint
 (FastAPI, Flask, Streamlit, etc.)
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from services.post_service import optimize_post, batch_optimize
 from services.analysis_service import analyze_voice, get_available_creators, compare_with_multiple_creators
 
