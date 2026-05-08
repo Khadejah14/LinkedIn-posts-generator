@@ -3,9 +3,11 @@
 from features.tone_analyzer import extract_profile, generate_with_profile, ToneProfile
 from features.post_generator import generate_posts, add_drafts
 from features.hook_scorer import score_hook, HookScore
+from utils.cache import cached, get_cache
 from typing import Optional
 
 
+@cached(ttl=1800)
 def optimize_post(
     draft: str,
     past_posts: list[str] = None,
@@ -13,12 +15,12 @@ def optimize_post(
 ) -> dict:
     """
     Create optimized post from user draft.
-    
+
     Args:
         draft: User's draft content
         past_posts: Optional past posts for tone analysis
         score_hook_flag: Whether to score the hook
-        
+
     Returns:
         Dict with 'post' and optionally 'hook_score'
     """
@@ -41,6 +43,7 @@ def optimize_post(
     return result
 
 
+@cached(ttl=1800)
 def batch_optimize(
     drafts: list[str],
     past_posts: list[str] = None,

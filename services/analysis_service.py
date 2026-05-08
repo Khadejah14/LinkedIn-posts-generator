@@ -7,20 +7,22 @@ from features.style_comparison import (
     get_radar_data,
     StyleComparison,
 )
+from utils.cache import cached, get_cache
 from typing import Optional
 
 
+@cached(ttl=3600)
 def analyze_voice(
     past_posts: list[str],
     creator_name: str = None,
 ) -> dict:
     """
     Analyze user voice and optionally compare with creator style.
-    
+
     Args:
         past_posts: User's past posts for tone analysis
         creator_name: Optional creator to compare against
-        
+
     Returns:
         Dict with tone_profile and optional style_comparison
     """
@@ -49,6 +51,7 @@ def get_available_creators() -> list[str]:
     return get_creator_names()
 
 
+@cached(ttl=3600)
 def compare_with_multiple_creators(
     past_posts: list[str],
     creator_names: list[str] = None,
